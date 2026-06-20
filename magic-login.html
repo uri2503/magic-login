@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Magic Login | Riedel Classics</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 380px;
+    width: 100%;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h1 span { color: #c0392b; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+  label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input {
+    width: 100%;
+    background: #0d0d0d;
+    border: 1px solid #333;
+    color: #eee;
+    padding: 11px 12px;
+    border-radius: 6px;
+    font-size: 15px;
+  }
+  input:focus { outline: none; border-color: #c0392b; }
+  .btn {
+    width: 100%;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    padding: 13px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  .btn:disabled { background: #444; cursor: not-allowed; }
+  .msg {
+    font-size: 13px;
+    margin-top: 16px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    display: none;
+  }
+  .msg.show { display: block; }
+  .msg.success { background: rgba(76,175,80,0.15); color: #4caf50; }
+  .msg.error { background: rgba(231,76,60,0.15); color: #e74c3c; }
+  .hidden { display: none; }
+  .session-info {
+    font-size: 13px;
+    color: #4caf50;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Riedel <span>Magic Login</span></h1>
+  <div class="subtitle">Einmal-Lösung zum Einloggen ohne Passwort</div>
+
+  <!-- Schritt 1: Magic Link anfordern -->
+  <div id="step1">
+    <label for="email">E-Mail</label>
+    <input type="email" id="email" value="u.riedel@riedel-classics.de">
+    <button class="btn" id="sendBtn">Magic Link senden</button>
+    <div class="msg" id="sendMsg"></div>
+  </div>
+
+  <!-- Schritt 2: nach Klick auf den Link in der Mail (Redirect hierher) -->
+  <div id="step2" class="hidden">
+    <div class="session-info">✓ Eingeloggt als <span id="userEmail"></span></div>
+    <label for="newPw1">Neues Passwort</label>
+    <input type="password" id="newPw1" placeholder="Mindestens 8 Zeichen">
+    <label for="newPw2">Passwort wiederholen</label>
+    <input type="password" id="newPw2" placeholder="Wiederholen">
+    <button class="btn" id="setPwBtn">Passwort setzen</button>
+    <div class="msg" id="pwMsg"></div>
+  </div>
+</div>
+
+<script>
+var SUPABASE_URL = "https://ysqzdqazcgyuzdorauiq.supabase.co";
+var SUPABASE_KEY = "sb_publishable_v4kXJa0y-2EHsCFPqBFHfg_QvzKLnt2";
+var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function zeigeMsg(el, text, art) {
+  el.textContent = text;
+  el.className = "msg show " + art;
+}
+
+document.getElementById("sendBtn").addEventListener("click", function() {
+  var email = document.getElementById("email").value.trim();
+  var btn = document.getElementById("sendBtn");
+  var msg = document.getElementById("sendMsg");
+  if (!email) return;
+
+  btn.disabled = true;
+  btn.textContent = "Sende...";
+
+  sb.auth.signInWithOtp({
+    email: email,
+    options: { emailRedirectTo: window.location.href }
+  }).then(function(result) {
+    btn.disabled = false;
+    btn.textContent = "Magic Link senden";
+    if (result.error) {
+      zeigeMsg(msg, "Fehler: " + result.error.message, "error");
+    } else {
+      zeigeMsg(msg, "✓ Link gesendet an " + email + ". E-Mail öffnen und auf den Link tippen.", "success");
+    }
+  });
+});
+
+document.getElementById("setPwBtn").addEventListener("click", function() {
+  var pw1 = document.getElementById("newPw1").value;
+  var pw2 = document.getElementById("newPw2").value;
+  var btn = document.getElementById("setPwBtn");
+  var msg = document.getElementById("pwMsg");
+
+  if (pw1.length < 8) {
+    zeigeMsg(msg, "Mindestens 8 Zeichen.", "error");
+    return;
+  }
+  if (pw1 !== pw2) {
+    zeigeMsg(msg, "Passwörter stimmen nicht überein.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Speichere...";
+
+  sb.auth.updateUser({ password: pw1 }).then(function(result) {
+    btn.disabled = false;
+    btn.textContent = "Passwort setzen";
+    if (result.error) {
+      zeigeMsg(msg, "Fehler: " + result.error.message, "error");
+    } else {
+      zeigeMsg(msg, "✓ Passwort gesetzt! Du kannst dich jetzt in der App ganz normal damit anmelden.", "success");
+    }
+  });
+});
+
+// Beim Laden prüfen: bin ich schon eingeloggt (z.B. nach Klick auf den Magic Link)?
+sb.auth.getSession().then(function(result) {
+  var session = result.data && result.data.session;
+  if (session) {
+    document.getElementById("step1").classList.add("hidden");
+    document.getElementById("step2").classList.remove("hidden");
+    document.getElementById("userEmail").textContent = session.user.email;
+  }
+});
+
+// Falls der Magic Link erst nach dem Laden ausgewertet wird
+sb.auth.onAuthStateChange(function(event, session) {
+  if (session) {
+    document.getElementById("step1").classList.add("hidden");
+    document.getElementById("step2").classList.remove("hidden");
+    document.getElementById("userEmail").textContent = session.user.email;
+  }
+});
+</script>
+</body>
+</html>
